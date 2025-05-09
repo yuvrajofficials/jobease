@@ -115,3 +115,35 @@ async def test_connection(token: str):
         return {"status": "connected", "message": "Successfully connected to z/OS", "system_info": system_info}
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
+
+
+@router.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    try:
+        host = "1"  # You may receive this another way
+        port = "443"            # Or accept as form_data.client_id etc.
+
+        system_info = run_zowe_command([
+            "zowe", "zosmf", "check", "status",
+            "--host", host,
+            "--port", str(port),
+            "--user", form_data.username,
+            "--password", form_data.password,
+            "--reject-unauthorized", "false",
+            "--rfj"
+        ])
+
+        token_data = {
+            "sub": form_data.username,
+            "host": host,
+            "port": port
+        }
+
+        access_token = create_access_token(data=token_data)
+
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Login failed: {str(e)}")

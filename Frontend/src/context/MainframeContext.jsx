@@ -17,15 +17,32 @@ export const MainframeProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [credentials, setCredentials] = useState(null);
+  const [userInfo, setUserInfo] = useState(null);
 
   useEffect(() => {
     // Load credentials from localStorage
     const storedCredentials = localStorage.getItem('credentials');
-    if (storedCredentials) {
-      setCredentials(JSON.parse(storedCredentials));
+    const token = localStorage.getItem('token');
+    
+    if (storedCredentials && token) {
+      const parsedCredentials = JSON.parse(storedCredentials);
+      setCredentials(parsedCredentials);
+      setUserInfo({
+        username: parsedCredentials.username,
+        host: parsedCredentials.host,
+        port: parsedCredentials.port
+      });
       setIsConnected(true);
+      console.log('User is logged in:', {
+        username: parsedCredentials.username,
+        host: parsedCredentials.host,
+        port: parsedCredentials.port
+      });
       fetchDatasets();
       fetchJobs();
+    } else {
+      console.log('No stored credentials found');
+      setIsConnected(false);
     }
   }, []);
 
@@ -33,6 +50,12 @@ export const MainframeProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
+      console.log('Attempting to connect with credentials:', {
+        username: credentials.username,
+        host: credentials.host,
+        port: credentials.port
+      });
+
       const response = await fetch('http://localhost:8000/auth/login', {
         method: 'POST',
         headers: {
@@ -50,10 +73,22 @@ export const MainframeProvider = ({ children }) => {
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('credentials', JSON.stringify(credentials));
       setCredentials(credentials);
+      setUserInfo({
+        username: credentials.username,
+        host: credentials.host,
+        port: credentials.port
+      });
       setIsConnected(true);
+      console.log('Successfully logged in:', {
+        username: credentials.username,
+        host: credentials.host,
+        port: credentials.port
+      });
+      
       await fetchDatasets();
       await fetchJobs();
     } catch (err) {
+      console.error('Login error:', err);
       setError(err.message);
       setIsConnected(false);
       throw err;
@@ -62,69 +97,151 @@ export const MainframeProvider = ({ children }) => {
     }
   };
 
+  // const fetchDatasets = async () => {
+  //   try {
+  //     setLoading(true);
+  //     setError(null);
+      
+  //     const storedCredentials = localStorage.getItem('mainframeCredentials');
+  //     if (!storedCredentials) {
+  //       throw new Error('No credentials found. Please log in again.');
+  //     }
+      
+  //     const credentials = JSON.parse(storedCredentials);
+  //     console.log('Fetching datasets with credentials:', {
+  //       username: credentials.username,
+  //       host: credentials.host,
+  //       port: credentials.port
+  //     });
+      
+  //     const response = await fetch('http://localhost:8000/api/datasets/', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'Authorization': `Bearer ${localStorage.getItem('token')}`
+  //       },
+  //       body: JSON.stringify(credentials)
+  //     });
+      
+  //     const data = await response.json();
+  //     console.log('Datasets response:', data);
+      
+  //     if (!response.ok) {
+  //       throw new Error(data.detail || 'Failed to fetch datasets');
+  //     }
+      
+  //     if (!data.datasets || !Array.isArray(data.datasets)) {
+  //       console.error('Invalid datasets response format:', data);
+  //       throw new Error('Invalid response format from server');
+  //     }
+      
+  //     setDatasets(data.datasets);
+  //     console.log('Successfully fetched datasets:', data.datasets);
+  //   } catch (error) {
+  //     console.error('Error fetching datasets:', error);
+  //     setError(error.message || 'Failed to fetch datasets');
+  //     setDatasets([]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+
   const fetchDatasets = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+
+    const storedCredentials = localStorage.getItem('credentials'); // <-- FIXED
+    if (!storedCredentials) {
+      throw new Error('No credentials found. Please log in again.');
+    }
+
+    const credentials = JSON.parse(storedCredentials);
+    console.log('Fetching datasets with credentials:', {
+      username: credentials.username,
+      host: credentials.host,
+      port: credentials.port
+    });
+
+    const response = await fetch('http://localhost:8000/api/datasets/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(credentials)
+    });
+
+    const data = await response.json();
+    console.log('Datasets response:', data);
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Failed to fetch datasets');
+    }
+
+    if (!data.datasets || !Array.isArray(data.datasets)) {
+      console.error('Invalid datasets response format:', data);
+      throw new Error('Invalid response format from server');
+    }
+
+    setDatasets(data.datasets);
+    console.log('Successfully fetched datasets:', data.datasets);
+  } catch (error) {
+    console.error('Error fetching datasets:', error);
+    setError(error.message || 'Failed to fetch datasets');
+    setDatasets([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const fetchJobs = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('http://localhost:8000/api/datasets/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        credentials: 'include'
+      const storedCredentials = localStorage.getItem('credentials');
+      if (!storedCredentials) {
+        throw new Error('No credentials found. Please log in again.');
+      }
+
+      const credentials = JSON.parse(storedCredentials);
+      console.log('Fetching jobs with credentials:', {
+        username: credentials.username,
+        host: credentials.host,
+        port: credentials.port
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to fetch datasets');
-      }
-
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        setDatasets(data);
-      } else {
-        console.error('Unexpected data format:', data);
-        throw new Error('Invalid data format received from server');
-      }
-    } catch (err) {
-      console.error('Error fetching datasets:', err);
-      setError(err.message || 'Failed to fetch datasets. Please try again.');
-      setDatasets([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchJobs = async () => {
-    if (!credentials) return;
-    
-    setLoading(true);
-    try {
+      
       const response = await fetch('http://localhost:8000/api/jobs/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(credentials)
+        body: JSON.stringify(credentials),
+        credentials: 'include'
       });
 
-      const data = await response.json();
-      
       if (!response.ok) {
-        console.error('Jobs fetch error:', data);
-        throw new Error(data.detail || 'Failed to fetch jobs. Please check your credentials and try again.');
+        const errorData = await response.json();
+        console.error('Jobs fetch error:', errorData);
+        throw new Error(errorData.detail || 'Failed to fetch jobs');
       }
 
-      console.log('Jobs response:', data); // Debug log
-      setJobs(data.jobs || []);
+      const data = await response.json();
+      console.log('Received jobs:', data);
+      
+      if (data.jobs && Array.isArray(data.jobs)) {
+        setJobs(data.jobs);
+      } else {
+        console.error('Unexpected data format:', data);
+        throw new Error('Invalid data format received from server');
+      }
     } catch (err) {
       console.error('Error fetching jobs:', err);
-      setError(err.message);
+      setError(err.message || 'Failed to fetch jobs. Please try again.');
       setJobs([]);
-      throw err; // Re-throw to handle in the calling function
     } finally {
       setLoading(false);
     }
@@ -134,9 +251,11 @@ export const MainframeProvider = ({ children }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('credentials');
     setCredentials(null);
+    setUserInfo(null);
     setIsConnected(false);
     setDatasets([]);
     setJobs([]);
+    console.log('User logged out');
   };
 
   const value = {
@@ -145,6 +264,7 @@ export const MainframeProvider = ({ children }) => {
     jobs,
     loading,
     error,
+    userInfo,
     connectToMainframe,
     disconnectFromMainframe,
     fetchDatasets,

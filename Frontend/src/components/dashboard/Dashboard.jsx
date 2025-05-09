@@ -11,7 +11,18 @@ const Dashboard = () => {
   const [selectedDataset, setSelectedDataset] = useState(null);
   const [datasetMembers, setDatasetMembers] = useState([]);
   const navigate = useNavigate();
-  const { connection, jobs, datasets, loading, error, submitJob, getJobStatus, fetchJobs, fetchDatasets } = useMainframe();
+  const { 
+    connection, 
+    jobs, 
+    datasets, 
+    loading, 
+    error, 
+    userInfo,
+    submitJob, 
+    getJobStatus, 
+    fetchJobs, 
+    fetchDatasets 
+  } = useMainframe();
 
   useEffect(() => {
     if (connection === null) {
@@ -76,10 +87,17 @@ const Dashboard = () => {
                 <h1 className="text-xl font-bold text-indigo-600">Mainframe Assistant</h1>
               </div>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center space-x-4">
+              {userInfo && (
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">User:</span> {userInfo.username}
+                  <span className="mx-2">|</span>
+                  <span className="font-medium">Host:</span> {userInfo.host}:{userInfo.port}
+                </div>
+              )}
               <button
                 onClick={handleLogout}
-                className="ml-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
               >
                 Logout
               </button>
@@ -90,6 +108,21 @@ const Dashboard = () => {
 
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          {error && (
+            <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               <button
@@ -126,26 +159,18 @@ const Dashboard = () => {
           </div>
 
           <div className="mt-6">
-            {error && (
-              <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700">{error}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {activeTab === 'datasets' && (
               <div className="bg-white shadow overflow-hidden sm:rounded-md">
                 <div className="px-4 py-5 sm:p-6">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Datasets</h3>
+                    <div>
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">Datasets</h3>
+                      {userInfo && (
+                        <p className="mt-1 text-sm text-gray-500">
+                          Showing datasets for user {userInfo.username}
+                        </p>
+                      )}
+                    </div>
                     <button
                       onClick={() => fetchDatasets()}
                       className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
