@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FiFile, FiFolder, FiChevronRight, FiChevronDown, FiCode, FiTerminal, FiSettings, FiDatabase, FiServer, FiHardDrive, FiRefreshCw, FiX, FiMaximize2, FiMinimize2, FiSave, FiPlay, FiBook, FiHelpCircle } from 'react-icons/fi';
 import MonacoEditor from '@monaco-editor/react';
 import { useMainframe } from '../context/MainframeContext';
+import { AIAssistant } from './ai/AIAssistant';
 
 const EditorDashboard = () => {
   const { datasets, jobs, loading, error, fetchDatasets, fetchJobs } = useMainframe();
@@ -81,6 +82,7 @@ const EditorDashboard = () => {
         }),
         credentials: 'include'
       });
+      
 
       console.log('Response status:', response.status);
       const data = await response.json();
@@ -127,23 +129,33 @@ const EditorDashboard = () => {
     setIsSaving(true);
     setSaveStatus(null);
     try {
+      const requestBody = {
+        content: fileContent,
+        host: localStorage.getItem('host'),
+        port: localStorage.getItem('port'),
+        username: localStorage.getItem('username'),
+        password: localStorage.getItem('password')
+      };
+
+      console.log('Saving file with data:', {
+        dataset: selectedDataset,
+        member: selectedFile,
+        contentLength: fileContent.length
+      });
+
       const response = await fetch(`http://localhost:8000/api/datasets/${selectedDataset}/members/${selectedFile}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          content: fileContent,
-          host: localStorage.getItem('host'),
-          port: localStorage.getItem('port'),
-          username: localStorage.getItem('username'),
-          password: localStorage.getItem('password')
-        }),
+        body: JSON.stringify(requestBody)
       });
       
+      const responseData = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Failed to save file');
+        throw new Error(responseData.detail || 'Failed to save file');
       }
       
       setSaveStatus('success');
@@ -557,43 +569,7 @@ const EditorDashboard = () => {
         {/* Chat Interface */}
         {activeRightTab === 'chat' && (
           <div className="flex-1 flex flex-col">
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {chatHistory.map((message, index) => (
-                <div
-                  key={index}
-                  className={`p-3 rounded-lg ${
-                    message.type === 'user' ? 'bg-blue-500/20 ml-8' : 'bg-[#37373d] mr-8'
-                  }`}
-                >
-                  {message.content}
-                </div>
-              ))}
-            </div>
-            <form onSubmit={handlePromptSubmit} className="p-4 border-t border-[#333]">
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Ask AI to help with your code..."
-                className="w-full bg-[#1e1e1e] text-gray-200 p-3 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-                rows={3}
-              />
-              <div className="mt-2 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isGenerating}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isGenerating ? (
-                    <>
-                      <FiRefreshCw className="inline-block animate-spin mr-2" />
-                      Generating...
-                    </>
-                  ) : (
-                    'Send'
-                  )}
-                </button>
-              </div>
-            </form>
+            <AIAssistant />
           </div>
         )}
 

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { MainframeProvider } from './context/MainframeContext';
 import Login from './components/auth/Login';
 import EditorDashboard from './components/EditorDashboard';
+import { AIAssistant } from './components/ai/AIAssistant';
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -20,6 +21,14 @@ function App() {
             element={
               <PrivateRoute>
                 <EditorDashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/ai"
+            element={
+              <PrivateRoute>
+                <AIAssistant />
               </PrivateRoute>
             }
           />

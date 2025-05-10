@@ -21,7 +21,12 @@ async def generate_code(
 ) -> Dict[str, Any]:
     try:
         response = await groq_service.generate_code(prompt)
-        return {"response": response}
+        # Return the content directly in the format expected by the frontend
+        return {
+            "content": response.get("response", ""),
+            "response": response.get("response", ""),
+            "explanation": response.get("explanation", "")
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
