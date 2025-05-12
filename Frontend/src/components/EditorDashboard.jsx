@@ -149,54 +149,65 @@ const EditorDashboard = () => {
   };
 
   const handleSave = async () => {
-    if (!selectedFile || !selectedDataset) return;
-    
-    setIsSaving(true);
-    setSaveStatus(null);
-    try {
-      const requestBody = {
-        content: fileContent,
-        host: localStorage.getItem('host'),
-        port: localStorage.getItem('port'),
-        username: localStorage.getItem('username'),
-        password: localStorage.getItem('password')
-      };
+  if (!selectedFile || !selectedDataset) return;
 
-      console.log('Saving file with data:', {
-        dataset: selectedDataset,
-        member: selectedFile,
-        contentLength: fileContent.length
-      });
+  setIsSaving(true);
+  setSaveStatus(null);
 
-      const response = await fetch(`http://localhost:8000/api/datasets/${selectedDataset}/members/${selectedFile}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(requestBody)
-      });
-      
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.detail || 'Failed to save file');
+  const credRaw = localStorage.getItem('credentials');
+  const cred = credRaw ? JSON.parse(credRaw) : null;
+
+  if (!cred) {
+    console.error('Missing credentials');
+    setSaveStatus('error');
+    return;
+  }
+
+  try {
+    const requestBody = {
+      content: fileContent,
+      credentials: {
+        host: cred.host,
+        port: cred.port,
+        username: cred.username,
+        password: cred.password
       }
-      
-      setSaveStatus('success');
-      // Update the file in our local state
-      setFiles(prev => prev.map(f => 
-        f.path === selectedFile ? { ...f, content: fileContent } : f
-      ));
-    } catch (error) {
-      console.error('Error saving file:', error);
-      setSaveStatus('error');
-    } finally {
-      setIsSaving(false);
-      // Clear status after 3 seconds
-      setTimeout(() => setSaveStatus(null), 3000);
+    };
+
+    console.log('Saving file with data:', {
+      dataset: selectedDataset,
+      member: selectedFile,
+      contentLength: fileContent.length
+    });
+
+    const response = await fetch(`http://localhost:8000/api/datasets/${selectedDataset}/members/${selectedFile}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      throw new Error(responseData.detail || 'Failed to save file');
     }
-  };
+
+    setSaveStatus('success');
+    setFiles(prev => prev.map(f =>
+      f.path === selectedFile ? { ...f, content: fileContent } : f
+    ));
+  } catch (error) {
+    console.error('Error saving file:', error);
+    setSaveStatus('error');
+  } finally {
+    setIsSaving(false);
+    setTimeout(() => setSaveStatus(null), 3000);
+  }
+};
+
 
   const handleExecute = async () => {
     if (!selectedFile || !selectedDataset) return;
@@ -293,7 +304,7 @@ const EditorDashboard = () => {
       {/* Left Sidebar */}
       <div className={`w-72 bg-[#252526] border-r border-[#333] transition-all duration-300 ${isFullscreen ? '-translate-x-full' : 'translate-x-0'}`}>
         <div className="p-4 border-b border-[#333]">
-          <h2 className="text-lg font-semibold text-white">Mainframe Explorer</h2>
+          <h2 className="text-lg font-semibold text-white">zCraft: Agentic Editor</h2>
         </div>
         
         {/* Tabs */}
@@ -543,22 +554,23 @@ const EditorDashboard = () => {
               </div>
             </div>
           ) : (
-            <MonacoEditor
-              height="100%"
-              defaultLanguage="jcl"
-              theme="vs-dark"
-              value={fileContent}
-              onChange={value => setFileContent(value)}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 14,
-                lineNumbers: 'on',
-                roundedSelection: false,
-                scrollBeyondLastLine: false,
-                readOnly: false,
-                automaticLayout: true,
-              }}
-            />
+           <MonacoEditor
+  height="100%"
+  theme="vs-dark"
+  defaultLanguage="jcl"
+  value={fileContent}
+  onChange={value => setFileContent(value)}
+  options={{
+    minimap: { enabled: false },
+    fontSize: 15,
+    lineNumbers: 'on',
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+    fontLigatures: true,
+    wordWrap: "on"
+  }}
+/>
+
           )}
         </div>
       </div>
@@ -566,30 +578,7 @@ const EditorDashboard = () => {
       {/* Right Sidebar */}
       <div className="w-80 bg-[#252526] border-l border-[#333] flex flex-col">
         {/* Right Sidebar Tabs */}
-        <div className="flex border-b border-[#333]">
-          <button
-            className={`flex-1 p-3 text-center transition-colors duration-200 ${
-              activeRightTab === 'chat' 
-                ? 'bg-[#37373d] text-blue-400 border-b-2 border-blue-400' 
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-            onClick={() => setActiveRightTab('chat')}
-          >
-            <FiHelpCircle className="inline-block mr-2" />
-            AI Assistant
-          </button>
-          <button
-            className={`flex-1 p-3 text-center transition-colors duration-200 ${
-              activeRightTab === 'learn' 
-                ? 'bg-[#37373d] text-blue-400 border-b-2 border-blue-400' 
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-            onClick={() => setActiveRightTab('learn')}
-          >
-            <FiBook className="inline-block mr-2" />
-            Learn
-          </button>
-        </div>
+       
 
         {/* Chat Interface */}
         {activeRightTab === 'chat' && (
@@ -598,48 +587,7 @@ const EditorDashboard = () => {
           </div>
         )}
 
-        {/* Learning Resources */}
-        {activeRightTab === 'learn' && (
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <div className="bg-[#37373d] p-4 rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">IBM z/OS Explorer Course</h3>
-              <div className="space-y-2">
-                <a
-                  href="https://www.ibm.com/training/zos"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block p-2 hover:bg-[#2a2d2e] rounded transition-colors duration-200"
-                >
-                  • Getting Started with z/OS
-                </a>
-                <a
-                  href="https://www.ibm.com/docs/en/zos/2.4.0"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block p-2 hover:bg-[#2a2d2e] rounded transition-colors duration-200"
-                >
-                  • Dataset Management
-                </a>
-                <a
-                  href="https://www.ibm.com/docs/en/zos/2.4.0"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block p-2 hover:bg-[#2a2d2e] rounded transition-colors duration-200"
-                >
-                  • JCL Programming
-                </a>
-                <a
-                  href="https://www.ibm.com/docs/en/zos/2.4.0"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block p-2 hover:bg-[#2a2d2e] rounded transition-colors duration-200"
-                >
-                  • USS File System
-                </a>
-              </div>
-            </div>
-          </div>
-        )}
+     
       </div>
     </div>
   );

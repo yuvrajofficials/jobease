@@ -485,160 +485,149 @@ async def view_member_via_jes(
         raise HTTPException(status_code=500, detail=f"Error viewing member via JES: {str(e)}")
 
 
+class UpdateRequest(BaseModel):
+    content: str
+    credentials: Credentials
+
 @router.put("/{dataset_name}/members/{member_name}")
 async def update_member_content(
     dataset_name: str,
     member_name: str,
-    content: FileContent,
-    credentials: Credentials,
+    request: UpdateRequest,
     current_user: dict = Depends(get_current_user)
 ):
+    credentials = request.credentials
+    content = request.content.strip()  # safe trimming
+
     try:
         print(f"Updating content for {dataset_name}({member_name})")
-        print(f"Content to update: {content.content}")
+        print(f"Content to update: {content[:100]}...")
 
-        # First try direct update with text/plain
+        # Try direct PUT
         try:
-            response = await make_zowe_request(
+            await make_zowe_request(
                 credentials,
                 f"ds/{dataset_name}({member_name})",
                 method="PUT",
                 headers={"Content-Type": "text/plain"},
-                data=content.content.encode('utf-8')  # Ensure content is properly encoded
+                data=content
             )
-            return {"message": "Member updated successfully"}
-        except Exception as e:
-            print(f"Direct update failed: {str(e)}")
+            return {"message": "Member updated successfully (Direct PUT)"}
+        except HTTPException as he:
+            print(f"Direct PUT failed: {he.status_code} - {he.detail}")
 
-        # If direct update fails, try using IEBUPDTE for PDS members
-        try:
-            # First check if it's a PDS
-            ds_info = await make_zowe_request(
-                credentials,
-                f"ds/{dataset_name}",
-                method="GET"
-            )
-            
-            if isinstance(ds_info, dict) and ds_info.get('dsorg', {}).get('PO'):  # It's a PDS
-                jcl_code = f"""//UPDTEJOB JOB (ACCT),'UPDATEMBR',CLASS=A,MSGCLASS=A,MSGLEVEL=(1,1)
+        # Fallback: determine dataset type
+        ds_info = await make_zowe_request(
+            credentials,
+            f"ds/{dataset_name}",
+            method="GET"
+        )
+
+        dsorg = ds_info.get("dsorg", "").strip().upper()
+        is_pds = dsorg == "PO"
+        print(f"Dataset {dataset_name} is {'PDS' if is_pds else 'PS or Other'}")
+
+        if is_pds:
+            jcl_code = f"""//UPDTEJOB JOB (ACCT),'UPDATEMBR',CLASS=A,MSGCLASS=A,MSGLEVEL=(1,1)
 //STEP1    EXEC PGM=IEBUPDTE,PARM=NEW
 //SYSPRINT DD SYSOUT=*
 //SYSUT2   DD DSN={dataset_name},DISP=OLD
 //SYSIN    DD *
 ./ ADD NAME={member_name}
-{content.content}
+{content}
 ./ ENDUP
 //"""
-            else:  # It's a PS dataset
-                jcl_code = f"""//UPDTEJOB JOB (ACCT),'UPDATEMBR',CLASS=A,MSGCLASS=A,MSGLEVEL=(1,1)
+        else:
+            jcl_code = f"""//UPDTEJOB JOB (ACCT),'UPDATEPS',CLASS=A,MSGCLASS=A,MSGLEVEL=(1,1)
 //STEP1    EXEC PGM=IEBGENER
+//SYSUT1   DD *
+{content}
+//SYSUT2   DD DSN={dataset_name},DISP=OLD
 //SYSPRINT DD SYSOUT=*
 //SYSIN    DD DUMMY
-//SYSUT1   DD *
-{content.content}
-//SYSUT2   DD DSN={dataset_name},DISP=OLD
 //"""
 
-            # Submit the job
-            auth = base64.b64encode(f"{credentials.username}:{credentials.password}".encode()).decode()
-            headers = {
-                "Authorization": f"Basic {auth}",
-                "Content-Type": "application/json",
-                "X-CSRF-ZOSMF-HEADER": "*"
-            }
+        # Prepare headers
+        auth = base64.b64encode(f"{credentials.username}:{credentials.password}".encode()).decode()
+        headers = {
+            "Authorization": f"Basic {auth}",
+            "Content-Type": "application/json",
+            "X-CSRF-ZOSMF-HEADER": "*"
+        }
 
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
 
-            async with aiohttp.ClientSession() as session:
-                # Get CSRF token
+        async with aiohttp.ClientSession() as session:
+            # CSRF Token
+            async with session.get(
+                f"https://{credentials.host}:{credentials.port}/zosmf/",
+                headers={"Authorization": f"Basic {auth}"},
+                ssl=ssl_context
+            ) as csrf_response:
+                csrf_token = csrf_response.headers.get("X-CSRF-ZOSMF-TOKEN")
+                if csrf_token:
+                    headers["X-CSRF-ZOSMF-TOKEN"] = csrf_token
+
+            # Submit JCL
+            async with session.post(
+                f"https://{credentials.host}:{credentials.port}/zosmf/restjobs/jobs",
+                headers=headers,
+                json={"file": "inline", "jcl": jcl_code},
+                ssl=ssl_context
+            ) as submit_response:
+                if submit_response.status != 201:
+                    error_text = await submit_response.text()
+                    raise HTTPException(status_code=submit_response.status, detail=f"Job submission failed: {error_text}")
+
+                job_info = await submit_response.json()
+                job_name = job_info.get("jobname")
+                job_id = job_info.get("jobid")
+
+            # Poll job status
+            for _ in range(10):
+                await asyncio.sleep(1)
                 async with session.get(
-                    f"https://{credentials.host}:{credentials.port}/zosmf/",
-                    headers={"Authorization": f"Basic {auth}"},
-                    ssl=ssl_context
-                ) as csrf_response:
-                    if csrf_response.status == 200:
-                        csrf_token = csrf_response.headers.get("X-CSRF-ZOSMF-TOKEN")
-                        if csrf_token:
-                            headers["X-CSRF-ZOSMF-TOKEN"] = csrf_token
-
-                # Submit the job
-                submit_url = f"https://{credentials.host}:{credentials.port}/zosmf/restjobs/jobs"
-                async with session.post(
-                    submit_url,
+                    f"https://{credentials.host}:{credentials.port}/zosmf/restjobs/jobs/{job_name}/{job_id}",
                     headers=headers,
-                    json={"file": "inline", "jcl": jcl_code},
                     ssl=ssl_context
-                ) as submit_response:
-                    if submit_response.status != 201:
-                        error_text = await submit_response.text()
-                        raise HTTPException(status_code=submit_response.status, detail=f"Failed to submit update job: {error_text}")
-                    
-                    job_info = await submit_response.json()
-                    job_name = job_info.get('jobname')
-                    job_id = job_info.get('jobid')
+                ) as status_response:
+                    job_status = await status_response.json()
+                    if job_status.get("status") == "OUTPUT":
+                        break
+            else:
+                raise HTTPException(status_code=504, detail="Update job did not complete in time")
 
-                # Wait for job completion
-                max_retries = 10
-                retry_count = 0
-                while retry_count < max_retries:
+            # Fetch SYSPRINT
+            async with session.get(
+                f"https://{credentials.host}:{credentials.port}/zosmf/restjobs/jobs/{job_name}/{job_id}/files",
+                headers=headers,
+                ssl=ssl_context
+            ) as files_response:
+                files = await files_response.json()
+
+            for file in files.get("items", []):
+                if file.get("ddname") == "SYSPRINT":
+                    file_id = file.get("id")
                     async with session.get(
-                        f"https://{credentials.host}:{credentials.port}/zosmf/restjobs/jobs/{job_name}/{job_id}",
+                        f"https://{credentials.host}:{credentials.port}/zosmf/restjobs/jobs/{job_name}/{job_id}/files/{file_id}/records",
                         headers=headers,
                         ssl=ssl_context
-                    ) as status_response:
-                        if status_response.status != 200:
-                            raise HTTPException(status_code=status_response.status, detail="Failed to get job status")
-                        
-                        status_data = await status_response.json()
-                        if status_data.get('status') == 'OUTPUT':
-                            break
-                        
-                        await asyncio.sleep(1)
-                        retry_count += 1
+                    ) as record_response:
+                        records = await record_response.json()
+                        output = "\n".join(records.get("records", []))
+                        if "ERROR" in output or "FAILED" in output:
+                            raise HTTPException(status_code=500, detail=f"Update failed:\n{output}")
 
-                if retry_count >= max_retries:
-                    raise HTTPException(status_code=504, detail="Update job did not complete in time")
-
-                # Check job output for success
-                async with session.get(
-                    f"https://{credentials.host}:{credentials.port}/zosmf/restjobs/jobs/{job_name}/{job_id}/files",
-                    headers=headers,
-                    ssl=ssl_context
-                ) as files_response:
-                    if files_response.status != 200:
-                        raise HTTPException(status_code=files_response.status, detail="Failed to get job files")
-                    
-                    files_data = await files_response.json()
-
-                # Check SYSPRINT for success
-                for file in files_data.get("items", []):
-                    if file.get("ddname") == "SYSPRINT":
-                        file_id = file.get("id")
-                        async with session.get(
-                            f"https://{credentials.host}:{credentials.port}/zosmf/restjobs/jobs/{job_name}/{job_id}/files/{file_id}/records",
-                            headers=headers,
-                            ssl=ssl_context
-                        ) as record_response:
-                            if record_response.status != 200:
-                                raise HTTPException(status_code=record_response.status, detail="Failed to get job output")
-                            
-                            record_data = await record_response.json()
-                            output = "\n".join(record_data.get("records", []))
-                            
-                            if "ERROR" in output or "FAILED" in output:
-                                raise HTTPException(status_code=500, detail=f"Update failed: {output}")
-
-                return {"message": "Member updated successfully"}
-
-        except Exception as e:
-            print(f"Error updating member content: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error updating member content: {str(e)}")
+            return {"message": "Member updated successfully via JCL"}
 
     except Exception as e:
-        print(f"Error updating member content: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error updating member content: {str(e)}")
+        print(f"❌ Unhandled error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unhandled error: {str(e)}")
+
+
+
 
 @router.post("/{dataset_name}/members/{member_name}/execute")
 async def execute_member(
