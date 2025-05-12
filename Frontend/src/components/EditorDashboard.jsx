@@ -1,32 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { FiFile, FiFolder, FiChevronRight, FiChevronDown, FiCode, FiTerminal, FiSettings, FiDatabase, FiServer, FiHardDrive, FiRefreshCw, FiX, FiMaximize2, FiMinimize2, FiSave, FiPlay, FiBook, FiHelpCircle } from 'react-icons/fi';
+
 import MonacoEditor from '@monaco-editor/react';
 import { useMainframe } from '../context/MainframeContext';
 import { AIAssistant } from './ai/AIAssistant';
-
+import {
+  FiFile, FiFolder, FiChevronRight, FiChevronDown, FiCode, FiTerminal,
+  FiSettings, FiDatabase, FiServer, FiHardDrive, FiRefreshCw,
+  FiX, FiMaximize2, FiMinimize2, FiSave, FiPlay, FiBook,
+  FiHelpCircle, FiMoon, FiSun
+} from 'react-icons/fi';
 const EditorDashboard = () => {
   const { datasets, jobs, loading, error, fetchDatasets, fetchJobs } = useMainframe();
   const [files, setFiles] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [expandedFolders, setExpandedFolders] = useState({});
+   const [expandedFolders, setExpandedFolders] = useState({});
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [analysis, setAnalysis] = useState(null);
-  const [activeTab, setActiveTab] = useState('datasets');
-  const [selectedDataset, setSelectedDataset] = useState(null);
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+const [selectedJob, setSelectedJob] = useState(null);
   const [datasetMembers, setDatasetMembers] = useState([]);
+const [chatHistory, setChatHistory] = useState([]);
+const [currentFile, setCurrentFile] = useState(null);
+
+
+  const [darkMode, setDarkMode] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedDataset, setSelectedDataset] = useState(null);
+  const [activeTab, setActiveTab] = useState('datasets');
+  const [activeRightTab, setActiveRightTab] = useState('chat');
+  const [fileContent, setFileContent] = useState('');
+  const [saveStatus, setSaveStatus] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [activeRightTab, setActiveRightTab] = useState('chat'); // 'chat' or 'learn'
-  const [chatHistory, setChatHistory] = useState([]);
-  const [isLoadingContent, setIsLoadingContent] = useState(false);
-  const [fileContent, setFileContent] = useState('');
-  const [currentFile, setCurrentFile] = useState(null);
-  const [fileError, setFileError] = useState(null);
-  const [saveStatus, setSaveStatus] = useState(null);
   const [executeStatus, setExecuteStatus] = useState(null);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [fileError, setFileError] = useState(null);
 
   useEffect(() => {
     fetchAnalysis();
@@ -122,7 +130,7 @@ const EditorDashboard = () => {
 
     setFileContent(data.content);
     setCurrentFile({ dataset, member });
-    setActiveTab('editor');
+    setActiveTab('datasets');
     setFileError(null);
   } catch (err) {
     console.error('Error fetching file content:', err);
@@ -300,51 +308,40 @@ const EditorDashboard = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#1e1e1e] text-gray-200">
-      {/* Left Sidebar */}
-      <div className={`w-72 bg-[#252526] border-r border-[#333] transition-all duration-300 ${isFullscreen ? '-translate-x-full' : 'translate-x-0'}`}>
-        <div className="p-4 border-b border-[#333]">
-          <h2 className="text-lg font-semibold text-white">zCraft: Agentic Editor</h2>
-        </div>
-        
-        {/* Tabs */}
-        <div className="flex border-b border-[#333]">
-          <button
-            className={`flex-1 p-3 text-center transition-colors duration-200 ${
-              activeTab === 'datasets' 
-                ? 'bg-[#37373d] text-blue-400 border-b-2 border-blue-400' 
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-            onClick={() => setActiveTab('datasets')}
-          >
-            <FiDatabase className="inline-block mr-2" />
-            Datasets
-          </button>
-          <button
-            className={`flex-1 p-3 text-center transition-colors duration-200 ${
-              activeTab === 'jobs' 
-                ? 'bg-[#37373d] text-blue-400 border-b-2 border-blue-400' 
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-            onClick={() => setActiveTab('jobs')}
-          >
-            <FiServer className="inline-block mr-2" />
-            Jobs
-          </button>
-          <button
-            className={`flex-1 p-3 text-center transition-colors duration-200 ${
-              activeTab === 'uss' 
-                ? 'bg-[#37373d] text-blue-400 border-b-2 border-blue-400' 
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-            onClick={() => setActiveTab('uss')}
-          >
-            <FiHardDrive className="inline-block mr-2" />
-            USS
-          </button>
-        </div>
+    <div className={`${darkMode ? 'dark' : ''}`}>
+      <div className="flex max-h-full bg-white text-gray-900 dark:bg-[#1e1e1e] dark:text-gray-200 transition-colors duration-300 font-sans">
+        {/* Sidebar */}
+        <div className={`w-72 bg-gray-100 dark:bg-[#252526] border-r border-gray-200 dark:border-[#333] transition-all duration-300 ${isFullscreen ? '-translate-x-full' : 'translate-x-0'}`}>
+          <div className="p-4 border-b border-gray-200 dark:border-[#333] flex justify-between items-center">
+            <h2 className="text-lg font-bold text-gray-800 dark:text-white">zCraft: Agentic Editor</h2>
+            <button onClick={() => setDarkMode(!darkMode)} className="text-gray-500 dark:text-gray-300 hover:text-blue-500">
+              {darkMode ? <FiSun /> : <FiMoon />}
+            </button>
+          </div>
 
-        {/* Dataset Tree */}
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 dark:border-[#333]">
+            {['datasets', 'jobs', 'uss'].map(tab => (
+              <button
+                key={tab}
+                className={`flex-1 p-3 text-center text-sm font-medium transition-all duration-200 ${activeTab === tab
+                  ? 'bg-blue-100 dark:bg-[#37373d] text-blue-700 dark:text-blue-400 border-b-2 border-blue-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-blue-500'}`}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab === 'datasets' && <FiDatabase className="inline-block mr-2" />}
+                {tab === 'jobs' && <FiServer className="inline-block mr-2" />}
+                {tab === 'uss' && <FiHardDrive className="inline-block mr-2" />}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Placeholder Dataset List */}
+          <div className="p-4 text-gray-500 dark:text-gray-400 text-sm">
+          
+
+            {/* Dataset Tree */}
         <div className="p-4 overflow-y-auto h-[calc(100vh-120px)]">
           {activeTab === 'datasets' && (
             <div className="space-y-2">
@@ -494,100 +491,95 @@ const EditorDashboard = () => {
           )}
         </div>
       </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Editor Header */}
-        <div className="h-12 bg-[#252526] border-b border-[#333] flex items-center justify-between px-4">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="text-gray-400 hover:text-gray-200 transition-colors duration-200"
-            >
-              {isFullscreen ? <FiMaximize2 /> : <FiMinimize2 />}
-            </button>
-            <span className="text-gray-300">
-              {selectedFile ? `${selectedDataset}(${selectedFile})` : 'No file selected'}
-            </span>
+      
           </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleSave}
-              disabled={isSaving || !selectedFile}
-              className={`p-2 text-gray-400 hover:text-gray-200 transition-colors duration-200 disabled:opacity-50 ${
-                saveStatus === 'success' ? 'text-green-400' : saveStatus === 'error' ? 'text-red-400' : ''
-              }`}
-              title={saveStatus === 'success' ? 'Saved!' : saveStatus === 'error' ? 'Save failed' : 'Save'}
-            >
-              <FiSave />
-            </button>
-            <button
-              onClick={handleExecute}
-              disabled={isExecuting || !selectedFile}
-              className={`p-2 text-gray-400 hover:text-gray-200 transition-colors duration-200 disabled:opacity-50 ${
-                executeStatus === 'success' ? 'text-green-400' : executeStatus === 'error' ? 'text-red-400' : ''
-              }`}
-              title={executeStatus === 'success' ? 'Job submitted!' : executeStatus === 'error' ? 'Execution failed' : 'Execute'}
-            >
-              <FiPlay />
-            </button>
-            <button className="p-2 text-gray-400 hover:text-gray-200 transition-colors duration-200">
-              <FiSettings />
-            </button>
-            <button className="p-2 text-gray-400 hover:text-gray-200 transition-colors duration-200">
-              <FiTerminal />
-            </button>
-          </div>
-        </div>
+        
 
-        {/* Editor */}
-        <div className="flex-1 bg-[#1e1e1e]">
-          {isLoadingContent ? (
-            <div className="flex items-center justify-center h-full">
-              <FiRefreshCw className="animate-spin text-blue-400 text-2xl" />
-              <span className="ml-2 text-gray-400">Loading file content...</span>
+        {/* Main Editor Area */}
+        <div className="flex-1 flex flex-col">
+          {/* Header */}
+          <div className="h-12 bg-gray-100 dark:bg-[#252526] border-b border-gray-200 dark:border-[#333] flex items-center justify-between px-4">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="text-gray-500 dark:text-gray-400 hover:text-blue-500"
+              >
+                {isFullscreen ? <FiMaximize2 /> : <FiMinimize2 />}
+              </button>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {selectedFile ? `${selectedDataset}(${selectedFile})` : 'No file selected'}
+              </span>
             </div>
-          ) : fileError ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-red-400 bg-red-900/20 p-4 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <button className="text-gray-500 dark:text-gray-400 hover:text-green-400 disabled:opacity-50">
+                <FiSave />
+              </button>
+              <button className="text-gray-500 dark:text-gray-400 hover:text-blue-400 disabled:opacity-50">
+                <FiPlay />
+              </button>
+              <button className="text-gray-500 dark:text-gray-400 hover:text-purple-400">
+                <FiSettings />
+              </button>
+              <button className="text-gray-500 dark:text-gray-400 hover:text-pink-400">
+                <FiTerminal />
+              </button>
+            </div>
+          </div>
+
+          {/* Code Editor */}
+          <div className="flex-1 w-full bg-white dark:bg-[#1e1e1e]">
+            {isLoadingContent ? (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <FiRefreshCw className="animate-spin mr-2" />
+                Loading...
+              </div>
+            ) : fileError ? (
+              <div className="flex items-center justify-center h-full text-red-500">
                 {fileError}
               </div>
-            </div>
-          ) : (
-           <MonacoEditor
-  height="100%"
-  theme="vs-dark"
-  defaultLanguage="jcl"
-  value={fileContent}
-  onChange={value => setFileContent(value)}
-  options={{
-    minimap: { enabled: false },
-    fontSize: 15,
-    lineNumbers: 'on',
-    scrollBeyondLastLine: false,
-    automaticLayout: true,
-    fontLigatures: true,
-    wordWrap: "on"
-  }}
-/>
-
-          )}
-        </div>
-      </div>
-
-      {/* Right Sidebar */}
-      <div className="w-80 bg-[#252526] border-l border-[#333] flex flex-col">
-        {/* Right Sidebar Tabs */}
-       
-
-        {/* Chat Interface */}
-        {activeRightTab === 'chat' && (
-          <div className="flex-1 flex flex-col">
-            <AIAssistant />
+            ) : (
+              <MonacoEditor
+                height="100%"
+                theme={darkMode ? "vs-dark" : "light"}
+                defaultLanguage="jcl"
+                value={fileContent}
+                onChange={value => setFileContent(value)}
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  fontLigatures: true,
+                  wordWrap: "on",
+                  fontFamily: "Fira Code, monospace"
+                }}
+              />
+            )}
           </div>
-        )}
+        </div>
 
-     
+        {/* Right Sidebar */}
+        <div className="w-80 bg-gray-100 dark:bg-[#252526] border-l border-gray-200 dark:border-[#333] flex flex-col">
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 dark:border-[#333]">
+            {/* {['chat', 'learn'].map(tab => (
+              <button
+                key={tab}
+                className={`flex-1 p-3 text-center text-sm transition-all duration-200 ${activeRightTab === tab
+                  ? 'bg-blue-100 dark:bg-[#37373d] text-blue-700 dark:text-blue-400 border-b-2 border-blue-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-blue-500'}`}
+                onClick={() => setActiveRightTab(tab)}
+              >
+                {tab === 'chat' ? <FiHelpCircle className="inline-block mr-2" /> : <FiBook className="inline-block mr-2" />}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))} */}
+          </div>
+              <AIAssistant />
+
+          
+        </div>
       </div>
     </div>
   );
