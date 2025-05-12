@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
+import Terminal from "./ui/Terminal"
 import MonacoEditor from '@monaco-editor/react';
 import { useMainframe } from '../context/MainframeContext';
 import { AIAssistant } from './ai/AIAssistant';
@@ -35,10 +35,15 @@ const [currentFile, setCurrentFile] = useState(null);
   const [executeStatus, setExecuteStatus] = useState(null);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [fileError, setFileError] = useState(null);
-
+  const [showTerminal,setShowTerminal] = useState(true);
   useEffect(() => {
     fetchAnalysis();
   }, []);
+
+ const toogleTerminal = () =>{
+  let v = showTerminal;
+  setShowTerminal(!v);
+ }
 
   useEffect(() => {
     if (selectedDataset) {
@@ -496,91 +501,94 @@ const [currentFile, setCurrentFile] = useState(null);
         
 
         {/* Main Editor Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <div className="h-12 bg-gray-100 dark:bg-[#252526] border-b border-gray-200 dark:border-[#333] flex items-center justify-between px-4">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setIsFullscreen(!isFullscreen)}
-                className="text-gray-500 dark:text-gray-400 hover:text-blue-500"
-              >
-                {isFullscreen ? <FiMaximize2 /> : <FiMinimize2 />}
-              </button>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {selectedFile ? `${selectedDataset}(${selectedFile})` : 'No file selected'}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <button className="text-gray-500 dark:text-gray-400 hover:text-green-400 disabled:opacity-50">
-                <FiSave />
-              </button>
-              <button className="text-gray-500 dark:text-gray-400 hover:text-blue-400 disabled:opacity-50">
-                <FiPlay />
-              </button>
-              <button className="text-gray-500 dark:text-gray-400 hover:text-purple-400">
-                <FiSettings />
-              </button>
-              <button className="text-gray-500 dark:text-gray-400 hover:text-pink-400">
-                <FiTerminal />
-              </button>
-            </div>
-          </div>
-
-          {/* Code Editor */}
-          <div className="flex-1 w-full bg-white dark:bg-[#1e1e1e]">
-            {isLoadingContent ? (
-              <div className="flex items-center justify-center h-full text-gray-500">
-                <FiRefreshCw className="animate-spin mr-2" />
-                Loading...
-              </div>
-            ) : fileError ? (
-              <div className="flex items-center justify-center h-full text-red-500">
-                {fileError}
-              </div>
-            ) : (
-              <MonacoEditor
-                height="100%"
-                theme={darkMode ? "vs-dark" : "light"}
-                defaultLanguage="jcl"
-                value={fileContent}
-                onChange={value => setFileContent(value)}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 14,
-                  lineNumbers: 'on',
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  fontLigatures: true,
-                  wordWrap: "on",
-                  fontFamily: "Fira Code, monospace"
-                }}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Right Sidebar */}
-        <div className="w-80 bg-gray-100 dark:bg-[#252526] border-l border-gray-200 dark:border-[#333] flex flex-col">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200 dark:border-[#333]">
-            {/* {['chat', 'learn'].map(tab => (
-              <button
-                key={tab}
-                className={`flex-1 p-3 text-center text-sm transition-all duration-200 ${activeRightTab === tab
-                  ? 'bg-blue-100 dark:bg-[#37373d] text-blue-700 dark:text-blue-400 border-b-2 border-blue-400'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-blue-500'}`}
-                onClick={() => setActiveRightTab(tab)}
-              >
-                {tab === 'chat' ? <FiHelpCircle className="inline-block mr-2" /> : <FiBook className="inline-block mr-2" />}
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))} */}
-          </div>
-              <AIAssistant />
-
-          
-        </div>
+    <div className="flex h-screen">
+  {/* Left Side: Main Editor Area */}
+  <div className="flex-1 flex flex-col overflow-hidden">
+    {/* Header */}
+    <div className="h-12 bg-gray-100 dark:bg-[#252526] border-b border-gray-200 dark:border-[#333] flex items-center justify-between px-4">
+      <div className="flex items-center space-x-4">
+        <button
+          onClick={() => setIsFullscreen(!isFullscreen)}
+          className="text-gray-500 dark:text-gray-400 hover:text-blue-500"
+        >
+          {isFullscreen ? <FiMaximize2 /> : <FiMinimize2 />}
+        </button>
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          {selectedFile ? `${selectedDataset}(${selectedFile})` : 'No file selected'}
+        </span>
       </div>
+      <div className="flex items-center space-x-2">
+        <button className="text-gray-500 dark:text-gray-400 hover:text-green-400 disabled:opacity-50">
+          <FiSave />
+        </button>
+        <button className="text-gray-500 dark:text-gray-400 hover:text-blue-400 disabled:opacity-50">
+          <FiPlay />
+        </button>
+        <button className="text-gray-500 dark:text-gray-400 hover:text-purple-400">
+          <FiSettings />
+        </button>
+        <button onClick={toogleTerminal} className="text-gray-500 dark:text-gray-400 hover:text-pink-400">
+          <FiTerminal />
+        </button>
+      </div>
+    </div>
+
+    {/* Code Editor + Terminal */}
+    <div className="flex flex-col flex-1 overflow-hidden bg-white dark:bg-[#1e1e1e]">
+      {/* Code Editor */}
+      <div className={`transition-all duration-300 ${showTerminal ? "h-1/2" : "h-full"}`}>
+        {isLoadingContent ? (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            <FiRefreshCw className="animate-spin mr-2" />
+            Loading...
+          </div>
+        ) : fileError ? (
+          <div className="flex items-center justify-center h-full text-red-500">
+            {fileError}
+          </div>
+        ) : (
+          <MonacoEditor
+            height="100%"
+            theme={darkMode ? "vs-dark" : "light"}
+            defaultLanguage="jcl"
+            value={fileContent}
+            onChange={(value) => setFileContent(value)}
+            options={{
+              minimap: { enabled: false },
+              fontSize: 14,
+              lineNumbers: "on",
+              scrollBeyondLastLine: false,
+              automaticLayout: true,
+              fontLigatures: true,
+              wordWrap: "on",
+              fontFamily: "Fira Code, monospace",
+            }}
+          />
+        )}
+      </div>
+
+      {/* Terminal */}
+      {showTerminal && (
+        <div className="h-1/2 border-t border-gray-300 dark:border-gray-700 bg-black">
+          <Terminal />
+        </div>
+      )}
+    </div>
+  </div>
+
+  {/* Right Sidebar */}
+  <div className="w-80 h-full flex flex-col bg-gray-100 dark:bg-[#252526] border-l border-gray-200 dark:border-[#333]">
+    {/* Tabs (if any) */}
+    <div className="flex  border-gray-200 dark:border-[#333]">
+      {/* Tabs can go here if needed */}
+    </div>
+    {/* Assistant */}
+    <div className="flex-1 overflow-y-auto">
+      <AIAssistant />
+    </div>
+  </div>
+</div>
+</div>
     </div>
   );
 };

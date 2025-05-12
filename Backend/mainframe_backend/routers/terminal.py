@@ -1,37 +1,37 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-import subprocess
+# terminal_router.py
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import asyncio
-from fastapi import APIRouter
-
-
 
 router = APIRouter(prefix="/api/terminal", tags=["Terminal"])
 
-
-@router.websocket("/ws/terminal")
+@router.websocket("/ws")
 async def terminal_websocket(websocket: WebSocket):
     await websocket.accept()
-
     try:
         while True:
-            data = await websocket.receive_text()
+            # Receive the command from the frontend
+            command = await websocket.receive_text()
 
-            # You may sanitize or validate allowed Zowe commands here
+            # Prefix the command with 'zowe ' to ensure it's sent to z/OS
+            full_command = f"{command}"
+
+            # Execute the Zowe CLI command
             process = await asyncio.create_subprocess_shell(
-                data,
+                full_command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
 
             stdout, stderr = await process.communicate()
 
+            # Send stdout and stderr back to the client
             if stdout:
                 await websocket.send_text(stdout.decode())
             if stderr:
                 await websocket.send_text(stderr.decode())
 
     except WebSocketDisconnect:
-        print("WebSocket disconnected")
+        print("🔌 WebSocket disconnected")
 
     except Exception as e:
-        await websocket.send_text(f"Error: {str(e)}")
+        await websocket.send_text(f"❌ Error: {str(e)}")
