@@ -38,77 +38,102 @@ const EditorDashboard = () => {
     }
   }, [selectedDataset]);
 
-  const fetchDatasetMembers = async (datasetName) => {
-    try {
-      const response = await fetch(`http://localhost:8000/api/datasets/${datasetName}/members`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          host: localStorage.getItem('host'),
-          port: localStorage.getItem('port'),
-          username: localStorage.getItem('username'),
-          password: localStorage.getItem('password')
-        })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setDatasetMembers(data.members || []);
-      }
-    } catch (error) {
-      console.error('Error fetching dataset members:', error);
-    }
-  };
+ const fetchDatasetMembers = async (datasetName) => {
+  const credRaw = localStorage.getItem('credentials');
+  const cred = credRaw ? JSON.parse(credRaw) : null;
 
-  const fetchFileContent = async (dataset, member) => {
-    try {
-      console.log('Fetching file content:', { dataset, member });
-      setIsLoadingContent(true);
-      setFileError(null);
+  console.log('Parsed credentials:', cred);
 
-      const response = await fetch(`http://localhost:8000/api/datasets/${dataset}/members/${member}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          host: localStorage.getItem('host'),
-          port: localStorage.getItem('port'),
-          username: localStorage.getItem('username'),
-          password: localStorage.getItem('password')
-        }),
-        credentials: 'include'
-      });
-      
+  if (!cred) {
+    console.error('No credentials found in localStorage');
+    return;
+  }
 
-      console.log('Response status:', response.status);
+  try {
+    const response = await fetch(`http://localhost:8000/api/datasets/${datasetName}/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        host: cred.host,
+        port: cred.port,
+        username: cred.username,
+        password: cred.password
+      })
+    });
+
+    if (response.ok) {
       const data = await response.json();
-      console.log('Response data:', data);
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Failed to fetch file content');
-      }
-
-      if (!data.content) {
-        throw new Error('No content found in response');
-      }
-
-      setFileContent(data.content);
-      setCurrentFile({ dataset, member });
-      setActiveTab('editor');
-      setFileError(null);
-    } catch (err) {
-      console.error('Error fetching file content:', err);
-      setFileError(err.message || 'Failed to fetch file content');
-      setFileContent('');
-      setCurrentFile(null);
-    } finally {
-      setIsLoadingContent(false);
+      setDatasetMembers(data.members || []);
+    } else {
+      const errorText = await response.text();
+      console.error('Failed to fetch dataset members:', errorText);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching dataset members:', error);
+  }
+};
+
+ const fetchFileContent = async (dataset, member) => {
+  const credRaw = localStorage.getItem('credentials');
+  const cred = credRaw ? JSON.parse(credRaw) : null;
+
+  console.log('Fetching file content:', { dataset, member, cred });
+
+  if (!cred) {
+    console.error('Missing credentials');
+    setFileError('Missing credentials');
+    return;
+  }
+
+  try {
+    setIsLoadingContent(true);
+    setFileError(null);
+
+    const response = await fetch(`http://localhost:8000/api/datasets/${dataset}/members/${member}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        host: cred.host,
+        port: cred.port,
+        username: cred.username,
+        password: cred.password
+      }),
+      credentials: 'include'
+    });
+
+    console.log('Response status:', response.status);
+
+    const data = await response.json();
+    console.log('Response data:', data);
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Failed to fetch file content');
+    }
+
+    if (!data.content) {
+      throw new Error('No content found in response');
+    }
+
+    setFileContent(data.content);
+    setCurrentFile({ dataset, member });
+    setActiveTab('editor');
+    setFileError(null);
+  } catch (err) {
+    console.error('Error fetching file content:', err);
+    setFileError(err.message || 'Failed to fetch file content');
+    setFileContent('');
+    setCurrentFile(null);
+  } finally {
+    setIsLoadingContent(false);
+  }
+};
+
 
   const handleFileSelect = async (datasetName, memberName) => {
     setSelectedDataset(datasetName);

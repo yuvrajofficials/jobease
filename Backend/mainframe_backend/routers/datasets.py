@@ -199,10 +199,15 @@ async def get_datasets(credentials: Credentials, current_user: dict = Depends(ge
 @router.post("/{dataset_name}/members")
 async def get_dataset_members(dataset_name: str, credentials: Credentials, current_user: dict = Depends(get_current_user)):
     try:
+        print(f"Fetching members for: {dataset_name}")
+        print(f"Credentials: {credentials}")
+        
         response = await make_zowe_request(
             credentials,
             f"ds/{dataset_name}/member"
         )
+
+        print(f"Raw Zowe response: {response}")
 
         members = []
         if isinstance(response, dict) and 'items' in response:
@@ -217,8 +222,10 @@ async def get_dataset_members(dataset_name: str, credentials: Credentials, curre
 
         return {"members": members}
     except Exception as e:
+        print(f"❌ Error fetching dataset members: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching dataset members: {str(e)}")
-    
+
+
 @router.post("/{dataset_name}/members/{member_name}")
 async def get_member_content(
     dataset_name: str,
