@@ -5,6 +5,7 @@ import subprocess
 import json
 from ..auth.jwt import create_access_token, verify_token
 from typing import Optional
+import os
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -28,12 +29,25 @@ class LoginRequest(BaseModel):
 
 def run_zowe_command(command: list) -> dict:
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        # For Windows, we need to use PowerShell to execute the command
+        if os.name == 'nt':  # Windows
+            # Convert the command list to a single string
+            command_str = ' '.join(command)
+            # Use PowerShell to execute the command
+            result = subprocess.run(
+                ['powershell', '-Command', command_str],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+        else:  # Unix-like systems
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+        
         return json.loads(result.stdout)
     except subprocess.CalledProcessError as e:
         print("Zowe CLI error:", e.stderr)

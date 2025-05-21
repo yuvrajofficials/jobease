@@ -66,8 +66,14 @@ async def make_zowe_request(credentials: Credentials, endpoint: str, method: str
 
             # Main API request
             url = f"{base_url}/{endpoint}"
+            print(f"Making request to: {url}")  # Debug log
+            print(f"With headers: {headers}")   # Debug log
+            
             async with session.request(method, url, headers=headers, json=data, timeout=30) as response:
                 response_text = await response.text()
+                print(f"Response status: {response.status}")  # Debug log
+                print(f"Response text: {response_text[:200]}...")  # Debug log first 200 chars
+                
                 if response.status == 200:
                     try:
                         return json.loads(response_text)
